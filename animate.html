@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>AQI Walk</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.1/mapbox-gl.js'></script>
+    <script src="point_data2.js"></script>
+    <script src="aqi_conv.js"></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.1/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+    </style>
+</head>
+<body>
+
+
+<!-- ********************CLASSIC HTML********************     -->
+
+<style>
+.overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+/* ------------- Legend ------------- */
+
+.legend {
+background-color: #fff;
+border-radius: 3px;
+bottom: 30px;
+box-shadow: 0 1px 2px rgba(0,0,0,0.10);
+font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+padding: 10px;
+position: absolute;
+right: 10px;
+z-index: 1;
+}
+ 
+.legend h4 {
+margin: 0 0 10px;
+}
+ 
+.legend div span {
+border-radius: 50%;
+display: inline-block;
+height: 10px;
+margin-right: 5px;
+width: 10px;
+}
+
+</style>
+
+
+<!-- ******************** CSS ********************     -->
+
+<div id='map'></div>
+<div class='overlay'>
+    <button id='replay'>Replay</button>
+</div>
+
+<div id='state-legend' class='legend' style='background-color: #FFFFFF'>
+<h4 style="text-align: center">Measured PM 2.5 <br> micrograms per cubic meter</h4>
+<font size="5" style="text-align: center"><div id='PM_Val'>Click a colored point.</div></font>
+</div>
+
+
+
+<!-- ******************** JavaScript ********************   -->
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiZG9taW5pcXVvIiwiYSI6ImNqdWIxajk5MDA4c2szeW1oZnpwdmp6bWUifQ.cS7YfiDUw83arJttmuhFzA';
+
+var map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [96.162673, 16.817926],
+    zoom: 12
+});
+
+
+function point_template(coords, pm_val, color){
+    this.type = 'Feature';
+    this.properties = {'color': color,
+                        'aqi_val': pm_val};
+    this.geometry = {'type': 'Point',
+                     'coordinates': coords
+                     };
+};
+
+
+function generate_points(location_vals, pm_vals){
+    console.assert(location_vals.length == pm_vals.length);
+    var total_n = location_vals.length;
+    var all_points = [];
+
+    var loc;
+    var pm_val;
+    var aqi;
+    for (i=0; i < total_n; i++){
+        loc = location_vals[i];
+        pm_val = pm_vals[i];
+        aqi = aqiFromPM(pm_val);
+        all_points.push(new point_template(loc, pm_val, getAQIColor(aqi)));
+    }
+    return all_points;
+}
+
+var route = {
+    "type": "FeatureCollection",
+    "features": new generate_points(loc_vals, air_vals)
+};
+
+map.on('load', function () {
+    map.addSource('route', {
+        "type": "geojson",
+        "data": route
+    });
+
+    map.addLayer({
+        'id': 'route',
+        'source': 'route',
+        'type': 'circle',
+        'paint': {
+            "circle-radius": 4,
+            "circle-color": ['get', 'color']
+        }
+    });
+});
+
+map.on('mouseenter', 'route', function(e) {
+    map.getCanvas().style.cursor = 'pointer';
+});
+
+map.on('mouseleave', 'route', function() {
+    map.getCanvas().style.cursor = '';
+});
+
+map.on('click', 'route', function (e) {
+    var props = e.features[0]['properties'];
+    console.log(props);
+    document.getElementById('PM_Val').innerHTML = props['aqi_val'].slice(1, -1);
+    document.getElementById("state-legend").style.backgroundColor = props['color'];
+});
+
+</script>
+
+
+</body>
+</html>
